@@ -108,6 +108,25 @@ function analyzeRequestIssues(timings: HarTimings): string[] {
 /**
  * 解析 HAR 檔案內容
  */
+/**
+ * 解析 startedDateTime，支援多種格式
+ */
+function parseStartTime(startedDateTime: string | number): number {
+  // 如果是數字（毫秒時間戳）
+  if (typeof startedDateTime === "number") {
+    return startedDateTime;
+  }
+
+  // 嘗試解析 ISO 字串
+  const parsed = new Date(startedDateTime).getTime();
+  if (!isNaN(parsed)) {
+    return parsed;
+  }
+
+  // 如果解析失敗，返回 0
+  return 0;
+}
+
 export function parseHarFile(
   content: string,
   regionName: string,
@@ -120,14 +139,24 @@ export function parseHarFile(
     throw new Error("HAR 檔案中沒有請求記錄");
   }
 
-  // 計算基準時間（第一個請求的開始時間）
-  const baseTime = new Date(entries[0].startedDateTime).getTime();
+  // 解析所有請求的開始時間
+  const startTimes = entries.map((entry) =>
+    parseStartTime(entry.startedDateTime)
+  );
+
+  // 計算基準時間（最早的請求開始時間）
+  const baseTime = Math.min(...startTimes.filter((t) => t > 0));
 
   const requests: ParsedRequest[] = entries.map((entry, index) => {
     const type = getRequestType(entry);
     const time = entry.time;
     const severity = getSeverity(time, type);
     const timings = normalizeTimings(entry.timings);
+
+    // 計算相對開始時間
+    const entryStartTime = parseStartTime(entry.startedDateTime);
+    const relativeStartTime =
+      baseTime > 0 && entryStartTime > 0 ? entryStartTime - baseTime : 0;
 
     return {
       id: `${regionName}-${index}`,
@@ -141,7 +170,7 @@ export function parseHarFile(
           : entry.response.content.size,
       time,
       timings,
-      startTime: new Date(entry.startedDateTime).getTime() - baseTime,
+      startTime: relativeStartTime,
       severity,
       issues: analyzeRequestIssues(timings),
     };

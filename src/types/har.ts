@@ -38,7 +38,7 @@ export interface HarPageTimings {
 }
 
 export interface HarEntry {
-  startedDateTime: string;
+  startedDateTime: string | number; // ISO 字串或毫秒時間戳
   time: number;
   request: HarRequest;
   response: HarResponse;
