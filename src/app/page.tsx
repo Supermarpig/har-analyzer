@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +20,11 @@ import {
   BarChart3,
   Globe,
   Lightbulb,
-  ArrowLeft,
   AlertTriangle,
   Clock,
   FileText,
   Timer,
+  Trash2,
 } from "lucide-react";
 
 interface UploadedFile {
@@ -32,11 +32,132 @@ interface UploadedFile {
   regionName: string;
 }
 
+const DB_NAME = "har-analyzer-db";
+const STORE_NAME = "analysis";
+const DB_VERSION = 1;
+const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 小時
+
+/**
+ * 開啟 IndexedDB
+ */
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    };
+  });
+}
+
+/**
+ * 從 IndexedDB 讀取分析結果（含過期檢查）
+ */
+async function loadFromStorage(): Promise<{
+  result: AnalysisResult | null;
+  selectedRegion: string | null;
+}> {
+  if (typeof window === "undefined") {
+    return { result: null, selectedRegion: null };
+  }
+
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get("latest");
+
+      request.onsuccess = () => {
+        if (request.result) {
+          const { timestamp, data, selectedRegion } = request.result;
+          const age = Date.now() - timestamp;
+
+          // 檢查是否過期（1 小時）
+          if (age > CACHE_EXPIRY_MS) {
+            store.delete("latest");
+            resolve({ result: null, selectedRegion: null });
+          } else {
+            resolve({
+              result: data || null,
+              selectedRegion: selectedRegion || null,
+            });
+          }
+        } else {
+          resolve({ result: null, selectedRegion: null });
+        }
+      };
+
+      request.onerror = () => {
+        resolve({ result: null, selectedRegion: null });
+      };
+    });
+  } catch {
+    return { result: null, selectedRegion: null };
+  }
+}
+
+/**
+ * 儲存分析結果到 IndexedDB（含時間戳）
+ */
+async function saveToStorage(
+  result: AnalysisResult | null,
+  selectedRegion: string | null
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    if (result) {
+      const data = {
+        id: "latest",
+        data: result,
+        selectedRegion,
+        timestamp: Date.now(),
+      };
+      store.put(data);
+    } else {
+      store.delete("latest");
+    }
+  } catch {
+    // 儲存失敗時靜默處理
+  }
+}
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // 頁面載入時從 IndexedDB 讀取數據
+  useEffect(() => {
+    loadFromStorage().then(({ result: savedResult, selectedRegion: savedRegion }) => {
+      if (savedResult) {
+        setResult(savedResult);
+        setSelectedRegion(savedRegion);
+      }
+      setIsMounted(true);
+    });
+  }, []);
+
+  // 當分析結果更新時儲存到 IndexedDB
+  useEffect(() => {
+    // 只在 mount 後且有新的分析結果時儲存
+    if (isMounted && result) {
+      saveToStorage(result, selectedRegion);
+    }
+  }, [result, selectedRegion, isMounted]);
 
   const handleAnalyze = async (files: UploadedFile[]) => {
     setIsLoading(true);
@@ -55,7 +176,6 @@ export default function Home() {
       setResult(analysisResult);
       setSelectedRegion(regions[0]?.name || null);
     } catch (err) {
-      console.error("分析錯誤：", err);
       setError(err instanceof Error ? err.message : "解析 HAR 檔案時發生錯誤");
     } finally {
       setIsLoading(false);
@@ -66,6 +186,7 @@ export default function Home() {
     setResult(null);
     setSelectedRegion(null);
     setError(null);
+    saveToStorage(null, null); // 清除 localStorage
   };
 
   const currentRegion = result?.regions.find((r) => r.name === selectedRegion);
@@ -86,10 +207,15 @@ export default function Home() {
               </div>
             </div>
             {result && (
-              <Button variant="outline" size="sm" onClick={handleReset}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                重新上傳
-              </Button>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  已快取
+                </Badge>
+                <Button variant="outline" size="sm" onClick={handleReset}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  清除並重新上傳
+                </Button>
+              </div>
             )}
           </div>
         </div>
