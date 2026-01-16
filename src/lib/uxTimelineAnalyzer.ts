@@ -228,7 +228,7 @@ function buildChain(
     nodes.push(node);
     prevId = currentRequest.id;
 
-    const currentEndTime = currentRequest.startTime + currentRequest.time;
+    const currentEndTime: number = currentRequest.startTime + currentRequest.time;
     currentRequest = allApiRequests.find(
       (r) =>
         !visited.has(r.id) &&
