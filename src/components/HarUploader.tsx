@@ -18,33 +18,34 @@ interface HarUploaderProps {
   isLoading?: boolean;
 }
 
-const PRESET_REGIONS = ["北京", "上海", "广州", "深圳"];
+/**
+ * 從檔案名稱提取地區名稱
+ * 移除 .har 副檔名
+ */
+function getRegionNameFromFile(fileName: string): string {
+  return fileName.replace(/\.har$/i, "");
+}
 
 export function HarUploader({ onAnalyze, isLoading }: HarUploaderProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
 
-      const droppedFiles = Array.from(e.dataTransfer.files).filter(
-        (f) => f.name.endsWith(".har") || f.type === "application/json"
-      );
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      (f) => f.name.endsWith(".har") || f.type === "application/json"
+    );
 
-      if (droppedFiles.length > 0) {
-        const newFiles = droppedFiles.map((file, index) => ({
-          file,
-          regionName:
-            PRESET_REGIONS[files.length + index] ||
-            `地區 ${files.length + index + 1}`,
-        }));
-        setFiles((prev) => [...prev, ...newFiles]);
-      }
-    },
-    [files.length]
-  );
+    if (droppedFiles.length > 0) {
+      const newFiles = droppedFiles.map((file) => ({
+        file,
+        regionName: getRegionNameFromFile(file.name),
+      }));
+      setFiles((prev) => [...prev, ...newFiles]);
+    }
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -63,24 +64,16 @@ export function HarUploader({ onAnalyze, isLoading }: HarUploaderProps) {
       );
 
       if (selectedFiles.length > 0) {
-        const newFiles = selectedFiles.map((file, index) => ({
+        const newFiles = selectedFiles.map((file) => ({
           file,
-          regionName:
-            PRESET_REGIONS[files.length + index] ||
-            `地區 ${files.length + index + 1}`,
+          regionName: getRegionNameFromFile(file.name),
         }));
         setFiles((prev) => [...prev, ...newFiles]);
       }
       e.target.value = "";
     },
-    [files.length]
+    []
   );
-
-  const updateRegionName = useCallback((index: number, name: string) => {
-    setFiles((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, regionName: name } : f))
-    );
-  }, []);
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -149,18 +142,12 @@ export function HarUploader({ onAnalyze, isLoading }: HarUploaderProps) {
                   <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
-                      {f.file.name}
+                      {f.regionName}
                     </p>
                     <p className="text-xs text-zinc-500">
                       {(f.file.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
-                  <Input
-                    value={f.regionName}
-                    onChange={(e) => updateRegionName(index, e.target.value)}
-                    className="w-32"
-                    placeholder="地區名稱"
-                  />
                   <Button
                     variant="ghost"
                     size="icon"

@@ -10,6 +10,7 @@ import { RequestTable } from "@/components/RequestTable";
 import { WaterfallChart } from "@/components/WaterfallChart";
 import { RegionComparison } from "@/components/RegionComparison";
 import { Recommendations } from "@/components/Recommendations";
+import { UXTimeline } from "@/components/UXTimeline";
 import { parseHarFile } from "@/lib/harParser";
 import { analyzeHarFiles } from "@/lib/analyzer";
 import { formatBytes, formatTime } from "@/lib/utils";
@@ -23,6 +24,7 @@ import {
   AlertTriangle,
   Clock,
   FileText,
+  Timer,
 } from "lucide-react";
 
 interface UploadedFile {
@@ -207,6 +209,10 @@ export default function Home() {
                     </Badge>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="ux-timeline" className="gap-2">
+                  <Timer className="w-4 h-4" />
+                  使用者體驗
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="requests">
@@ -271,6 +277,20 @@ export default function Home() {
                   </CardHeader>
                   <CardContent>
                     <Recommendations recommendations={result.recommendations} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="ux-timeline">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Timer className="w-5 h-5" />
+                      {selectedRegion} - 使用者體驗時間軸
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {currentRegion && <UXTimeline region={currentRegion} />}
                   </CardContent>
                 </Card>
               </TabsContent>

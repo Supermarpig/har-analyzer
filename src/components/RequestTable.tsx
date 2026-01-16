@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import {
   Table,
   TableBody,
@@ -160,9 +160,8 @@ export function RequestTable({ requests, regionName }: RequestTableProps) {
           </TableHeader>
           <TableBody>
             {filteredAndSortedRequests.map((request) => (
-              <>
+              <Fragment key={request.id}>
                 <TableRow
-                  key={request.id}
                   className={`cursor-pointer ${
                     SEVERITY_COLORS[request.severity]
                   }`}
@@ -299,7 +298,7 @@ export function RequestTable({ requests, regionName }: RequestTableProps) {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </Fragment>
             ))}
           </TableBody>
         </Table>

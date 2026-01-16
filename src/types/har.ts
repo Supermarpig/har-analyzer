@@ -222,3 +222,86 @@ export interface Recommendation {
   affectedUrls: string[];
   affectedRegions: string[];
 }
+
+// ============ 使用者體驗時間軸型別 ============
+
+/**
+ * 關鍵里程碑類型
+ */
+export type MilestoneType =
+  | "html_loaded"
+  | "render_blocking_done"
+  | "first_api_response"
+  | "critical_resources_done";
+
+/**
+ * 里程碑資料
+ */
+export interface Milestone {
+  type: MilestoneType;
+  label: string;
+  time: number;
+  requests: ParsedRequest[];
+  description: string;
+}
+
+/**
+ * 阻塞資源標記
+ */
+export interface BlockingResource {
+  request: ParsedRequest;
+  blockingType: "script" | "stylesheet";
+  isInHead: boolean;
+  blockingDuration: number;
+  impact: "high" | "medium" | "low";
+}
+
+/**
+ * API 依賴鏈節點
+ */
+export interface ApiChainNode {
+  request: ParsedRequest;
+  startTime: number;
+  endTime: number;
+  dependsOn: string | null;
+}
+
+/**
+ * API 調用鏈
+ */
+export interface ApiChain {
+  id: string;
+  nodes: ApiChainNode[];
+  totalDuration: number;
+  chainLength: number;
+  bottleneck: ApiChainNode;
+}
+
+/**
+ * 使用者等待區間
+ */
+export interface WaitingPeriod {
+  startTime: number;
+  endTime: number;
+  duration: number;
+  reason: string;
+  relatedRequests: ParsedRequest[];
+  severity: SeverityLevel;
+}
+
+/**
+ * 使用者體驗時間軸分析結果
+ */
+export interface UXTimelineResult {
+  milestones: Milestone[];
+  blockingResources: BlockingResource[];
+  apiChains: ApiChain[];
+  waitingPeriods: WaitingPeriod[];
+  summary: {
+    timeToFirstPaint: number;
+    timeToInteractive: number;
+    totalBlockingTime: number;
+    longestApiChain: number;
+    criticalPath: ParsedRequest[];
+  };
+}
