@@ -191,6 +191,30 @@ export default function Home() {
 
   const currentRegion = result?.regions.find((r) => r.name === selectedRegion);
 
+  // 在 mount 完成前顯示載入狀態，避免從 cache 載入時閃爍
+  if (!isMounted) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
+        <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
+                <Activity className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">HAR 分析器</h1>
+                <p className="text-xs text-zinc-500">多地區效能診斷工具</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+          <div className="animate-pulse text-zinc-500">載入中...</div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       {/* Header */}
@@ -224,7 +248,7 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {!result ? (
           // 上傳介面
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto animate-in fade-in-0 slide-in-from-bottom-6 duration-500 ease-out">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 分析網路效能瓶頸
@@ -263,7 +287,7 @@ export default function Home() {
           </div>
         ) : (
           // 分析結果介面
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-6 duration-500 ease-out">
             {/* 地區概覽卡片 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {result.regions.map((region) => (
@@ -342,7 +366,10 @@ export default function Home() {
               </TabsList>
 
               <TabsContent value="requests">
-                <Card>
+                <Card
+                  key={selectedRegion}
+                  className="animate-in fade-in-0 slide-in-from-right-4 duration-300 ease-out"
+                >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <BarChart3 className="w-5 h-5" />
@@ -361,7 +388,10 @@ export default function Home() {
               </TabsContent>
 
               <TabsContent value="waterfall">
-                <Card>
+                <Card
+                  key={selectedRegion}
+                  className="animate-in fade-in-0 slide-in-from-right-4 duration-300 ease-out"
+                >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Activity className="w-5 h-5" />
@@ -408,7 +438,10 @@ export default function Home() {
               </TabsContent>
 
               <TabsContent value="ux-timeline">
-                <Card>
+                <Card
+                  key={selectedRegion}
+                  className="animate-in fade-in-0 slide-in-from-right-4 duration-300 ease-out"
+                >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Timer className="w-5 h-5" />

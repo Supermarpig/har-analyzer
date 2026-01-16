@@ -262,6 +262,125 @@ function SummaryCard({
 import type { BlockingResource } from "@/types/har";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
+/**
+ * 根據資源特性生成客製化優化建議
+ */
+function getOptimizationSuggestions(resource: BlockingResource): string[] {
+  const suggestions: string[] = [];
+  const { request, blockingType, blockingDuration, impact } = resource;
+  const sizeKB = request.size / 1024;
+  const ttfb = request.timings.wait;
+  const downloadTime = request.timings.receive;
+  const url = request.url;
+
+  // 判斷是否為第三方資源
+  const isThirdParty = !url.includes(window.location.hostname);
+  const fileName = url.split("/").pop()?.split("?")[0] || "";
+
+  if (blockingType === "script") {
+    // === JavaScript 優化建議 ===
+
+    // 根據影響程度
+    if (impact === "high") {
+      suggestions.push(
+        `此腳本阻塞 ${Math.round(blockingDuration)}ms，強烈建議優化`
+      );
+    }
+
+    // 根據 TTFB
+    if (ttfb > 200) {
+      if (isThirdParty) {
+        suggestions.push(
+          `TTFB ${Math.round(ttfb)}ms 過高，考慮自行託管此第三方腳本`
+        );
+      } else {
+        suggestions.push(
+          `TTFB ${Math.round(ttfb)}ms 過高，檢查伺服器回應速度或加 CDN`
+        );
+      }
+    }
+
+    // 根據檔案大小
+    if (sizeKB > 100) {
+      suggestions.push(
+        `檔案 ${sizeKB.toFixed(0)}KB 過大，建議代碼分割 (code splitting)`
+      );
+    } else if (sizeKB > 50) {
+      suggestions.push(`檔案 ${sizeKB.toFixed(0)}KB，考慮 Tree Shaking 移除未用代碼`);
+    }
+
+    // 根據下載時間
+    if (downloadTime > 100 && sizeKB < 50) {
+      suggestions.push("下載時間長但檔案小，檢查是否啟用 Gzip/Brotli 壓縮");
+    }
+
+    // 根據檔案名稱判斷用途
+    if (fileName.includes("analytics") || fileName.includes("tracking")) {
+      suggestions.push("追蹤腳本不應阻塞渲染，改用 async 載入");
+    } else if (fileName.includes("vendor") || fileName.includes("polyfill")) {
+      suggestions.push("第三方/Polyfill 腳本建議使用 defer 或動態載入");
+    } else if (fileName.includes("chunk")) {
+      suggestions.push("此為分割後的 chunk，確認是否為首屏必要資源");
+    } else {
+      suggestions.push("若非首屏必要，添加 defer 屬性延遲執行");
+    }
+
+    // 第三方資源特別建議
+    if (isThirdParty) {
+      suggestions.push("第三方腳本建議加上 dns-prefetch 或 preconnect");
+    }
+  } else {
+    // === CSS 優化建議 ===
+
+    if (impact === "high") {
+      suggestions.push(
+        `此樣式阻塞 ${Math.round(blockingDuration)}ms，強烈建議優化`
+      );
+    }
+
+    // 根據 TTFB
+    if (ttfb > 200) {
+      if (isThirdParty) {
+        suggestions.push(
+          `TTFB ${Math.round(ttfb)}ms 過高，考慮自行託管 CSS 或使用 CDN`
+        );
+      } else {
+        suggestions.push(`TTFB ${Math.round(ttfb)}ms 過高，檢查伺服器快取設定`);
+      }
+    }
+
+    // 根據檔案大小
+    if (sizeKB > 50) {
+      suggestions.push(
+        `檔案 ${sizeKB.toFixed(0)}KB 過大，建議拆分為關鍵/非關鍵 CSS`
+      );
+    } else if (sizeKB < 5) {
+      suggestions.push(`檔案僅 ${sizeKB.toFixed(1)}KB，可考慮內聯到 HTML 中`);
+    }
+
+    // 根據下載時間
+    if (downloadTime > 100 && sizeKB < 30) {
+      suggestions.push("下載時間長但檔案小，確認是否啟用壓縮");
+    }
+
+    // 根據檔案名稱
+    if (fileName.includes("font") || url.includes("fonts.googleapis")) {
+      suggestions.push("字體 CSS 建議加上 font-display: swap");
+    } else if (fileName.includes("print")) {
+      suggestions.push("列印樣式不需阻塞渲染，加上 media=\"print\"");
+    } else {
+      suggestions.push("提取首屏關鍵 CSS 內聯，其餘用 preload 載入");
+    }
+  }
+
+  // 如果沒有特別建議，給通用建議
+  if (suggestions.length === 0) {
+    suggestions.push("檢查此資源是否為首屏渲染必要");
+  }
+
+  return suggestions.slice(0, 4); // 最多顯示 4 條建議
+}
+
 function BlockingResourcesCard({
   resources,
 }: {
@@ -390,23 +509,9 @@ function BlockingResourcesCard({
                     <div>
                       <p className="text-xs text-zinc-500 mb-1">優化建議</p>
                       <ul className="text-xs text-yellow-400/80 space-y-1">
-                        {resource.blockingType === "script" ? (
-                          <>
-                            <li>• 考慮添加 async 或 defer 屬性</li>
-                            <li>• 將非關鍵 JS 延遲載入</li>
-                            {resource.request.size > 50000 && (
-                              <li>• 檔案較大，考慮代碼分割</li>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <li>• 考慮內聯關鍵 CSS</li>
-                            <li>• 移除未使用的 CSS</li>
-                            {resource.request.size > 30000 && (
-                              <li>• 檔案較大，考慮拆分</li>
-                            )}
-                          </>
-                        )}
+                        {getOptimizationSuggestions(resource).map((suggestion, idx) => (
+                          <li key={idx}>• {suggestion}</li>
+                        ))}
                       </ul>
                     </div>
                   </div>
