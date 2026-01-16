@@ -104,20 +104,22 @@ function identifyMilestones(requests: ParsedRequest[]): Milestone[] {
     });
   }
 
-  // 4. 最後一個關鍵資源完成時間
-  const criticalResources = requests.filter(
+  // 4. 初始載入完成時間（只考慮前 10 秒內開始的關鍵資源）
+  const INITIAL_LOAD_THRESHOLD = 10000; // 10 秒
+  const initialResources = requests.filter(
     (r) =>
-      r.type === "document" ||
-      r.type === "script" ||
-      r.type === "stylesheet" ||
-      r.type === "xhr" ||
-      r.type === "fetch"
+      r.startTime <= INITIAL_LOAD_THRESHOLD &&
+      (r.type === "document" ||
+        r.type === "script" ||
+        r.type === "stylesheet" ||
+        r.type === "xhr" ||
+        r.type === "fetch")
   );
-  if (criticalResources.length > 0) {
+  if (initialResources.length > 0) {
     const lastCriticalTime = Math.max(
-      ...criticalResources.map((r) => r.startTime + r.time)
+      ...initialResources.map((r) => r.startTime + r.time)
     );
-    const lastCritical = criticalResources.find(
+    const lastCritical = initialResources.find(
       (r) => r.startTime + r.time === lastCriticalTime
     );
     milestones.push({
@@ -125,7 +127,7 @@ function identifyMilestones(requests: ParsedRequest[]): Milestone[] {
       label: "關鍵資源完成",
       time: lastCriticalTime,
       requests: lastCritical ? [lastCritical] : [],
-      description: `所有關鍵資源載入完成`,
+      description: `初始載入完成（${initialResources.length} 個資源）`,
     });
   }
 
